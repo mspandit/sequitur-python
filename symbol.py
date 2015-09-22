@@ -33,7 +33,7 @@ class Symbol(object):
             self.delete_digram()
             
             """
-            self is to deal with triples, where we only record the second
+            This is to deal with triples, where we only record the second
             pair of overlapping digrams. When we delete the second pair,
             we insert the first pair into the hash table so that we don't
             forget about it. e.g. abbbabcbb
@@ -158,69 +158,3 @@ class Symbol(object):
     def hash_value(self):
         """docstring for hash_value"""
         return "%s+%s" % (self.string_value(), self.next.string_value())
-
-    rule_set = None
-    output_array = None
-    line_length = None
-
-    @staticmethod
-    def print_rule(rule):
-        """docstring for print_rule"""
-        symbol = rule.first()
-        while not symbol.is_guard():
-            if symbol.rule is not None:
-                rule_number = None
-                if (Symbol.rule_set[symbol.rule.number] == symbol.rule):
-                    rule_number = symbol.rule.number
-                else:
-                    rule_number = len(Symbol.rule_set)
-                    symbol.rule.number = len(Symbol.rule_set)
-                    Symbol.rule_set.append(symbol.rule)
-                Symbol.output_array.append("%d " % rule_number)
-                Symbol.line_length += len("%d " % rule_number)
-            else:
-                Symbol.output_array.append(Symbol.print_terminal(symbol.value()))
-                Symbol.output_array.append(' ')
-                Symbol.line_length += 2
-            symbol = symbol.next
-
-    @staticmethod
-    def print_terminal(value):
-        """docstring for print_terminal"""
-        if (' ' == value):
-            return '_'
-        elif ("\n" == value):
-            return "\n"
-        else:
-            return value
-
-    @staticmethod
-    def print_rule_expansion(rule):
-        """docstring for print_rule_expansion"""
-        symbol = rule.first()
-        while not symbol.is_guard():
-            if symbol.rule:
-                Symbol.print_rule_expansion(symbol.rule)
-            else:
-                Symbol.output_array.append(Symbol.print_terminal(symbol.value()))
-            symbol = symbol.next
-
-    @staticmethod
-    def print_grammar(s):
-        """docstring for print_grammar"""
-        Symbol.output_array = []
-        Symbol.rule_set = [s]
-    
-        i = 0
-        while i < len(Symbol.rule_set):
-            Symbol.output_array.append("%s --> " % i)
-            Symbol.line_length = len("%d   " % i)
-            Symbol.print_rule(Symbol.rule_set[i])
-        
-            if i > 0:
-                for j in range(Symbol.line_length, 50):
-                    Symbol.output_array.append(' ')
-                Symbol.print_rule_expansion(Symbol.rule_set[i])
-            Symbol.output_array.append('\n');
-            i += 1
-        return "".join(Symbol.output_array)

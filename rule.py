@@ -17,7 +17,6 @@ class Rule(object):
         self.reference_count = 0
         self.guard.join(self.guard)
         
-        self.number = 0 # not essential to algorithm
         self.unique_number = Rule.unique_rule_number
         Rule.unique_rule_number += 1
 
