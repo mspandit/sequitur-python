@@ -10,10 +10,10 @@ class Rule(object):
     
     unique_rule_number = 1
     
-    def __init__(self):
+    def __init__(self, grammar):
         super(Rule, self).__init__()
         self.reference_count = 0 # # of times the rule is used in the grammar
-        self.guard = Symbol(self)
+        self.guard = Symbol(self, grammar)
         self.reference_count = 0
         self.guard.join(self.guard)
         

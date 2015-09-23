@@ -1,9 +1,10 @@
 
 class Symbol(object):
     """docstring for Symbol"""
-    def __init__(self, value):
+    def __init__(self, value, grammar):
         from rule import Rule
         super(Symbol, self).__init__()
+        self.grammar = grammar
         self.next = None
         self.prev = None
         self.terminal = None
@@ -23,8 +24,6 @@ class Symbol(object):
         else:
             print "Did not recognize %s" % value
 
-    digram_index = {}
-
     def join(self, right):
         """
         Links two symbols together, removing any old digram from the hash table.
@@ -42,11 +41,11 @@ class Symbol(object):
             if ((right.prev is not None) and (right.next is not None) and
                 right.value() == right.prev.value() and
                 right.value() == right.next.value()):
-                Symbol.digram_index[right.hash_value()] = right
+                self.grammar.add_index(right)
             if ((self.prev is not None) and (self.next is not None) and
                 self.value() == self.next.value() and
                 self.value() == self.prev.value()):
-                Symbol.digram_index[self.hash_value()] = self
+                self.grammar.add_index(self)
         self.next = right
         right.prev = self
 
@@ -66,8 +65,7 @@ class Symbol(object):
         if (self.is_guard() or self.next.is_guard()):
             return
         
-        if (Symbol.digram_index.get(self.hash_value()) == self):
-            Symbol.digram_index[self.hash_value()] = None
+        self.grammar.clear_index(self)
 
     def insert_after(self, symbol):
         """Inserts a symbol after this one"""
@@ -88,9 +86,9 @@ class Symbol(object):
         """
         if (self.is_guard() or self.next.is_guard()):
             return None
-        match = Symbol.digram_index.get(self.hash_value())
+        match = self.grammar.get_index(self)
         if not match:
-            Symbol.digram_index[self.hash_value()] = self
+            self.grammar.add_index(self)
             return False
         if match.next != self:
             self.process_match(match)
@@ -106,18 +104,17 @@ class Symbol(object):
         first = self.rule.first()
         last = self.rule.last()
         
-        if (Symbol.digram_index[self.hash_value()] == self):
-            Symbol.digram_index[self.hash_value()] = None
+        self.grammar.clear_index(self)
         left.join(first)
         last.join(right)
-        Symbol.digram_index[last.hash_value()] = last
+        self.grammar.add_index(last)
 
     def substitute(self, rule):
         """Replace a digram with a non-terminal"""
         prev = self.prev
         prev.next.delete()
         prev.next.delete()
-        prev.insert_after(Symbol(rule))
+        prev.insert_after(Symbol(rule, self.grammar))
         if not prev.check():
             prev.next.check()
 
@@ -131,14 +128,14 @@ class Symbol(object):
             self.substitute(rule)
         else:
             # create a new rule
-            rule = Rule()
-            rule.last().insert_after(Symbol(self))
-            rule.last().insert_after(Symbol(self.next))
+            rule = Rule(self.grammar)
+            rule.last().insert_after(Symbol(self, self.grammar))
+            rule.last().insert_after(Symbol(self.next, self.grammar))
             
             match.substitute(rule)
             self.substitute(rule)
             
-            Symbol.digram_index[rule.first().hash_value()] = rule.first()
+            self.grammar.add_index(rule.first())
 
         # Check for an under-used rule
         if (rule.first().rule and (rule.first().rule.reference_count == 1)):

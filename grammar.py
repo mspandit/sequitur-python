@@ -6,16 +6,31 @@ class Grammar(object):
     def __init__(self):
         super(Grammar, self).__init__()
         self.digram_index = {}
-        self.root_production = Rule()
+        self.root_production = Rule(self)
 
     def train_string(self, string):
         """docstring for train_string"""
         input_sequence = [c for c in string]
         if (0 < len(input_sequence)):
-            self.root_production.last().insert_after(Symbol(input_sequence.pop(0)))
+            self.root_production.last().insert_after(Symbol(input_sequence.pop(0), self))
+        count = 2
         while (0 < len(input_sequence)):
-            self.root_production.last().insert_after(Symbol(input_sequence.pop(0)))
+            self.root_production.last().insert_after(Symbol(input_sequence.pop(0), self))
             self.root_production.last().prev.check()
+            count += 1
+
+    def add_index(self, digram):
+        """docstring for index"""
+        self.digram_index[digram.hash_value()] = digram
+
+    def get_index(self, digram):
+        """docstring for get"""
+        return self.digram_index.get(digram.hash_value())
+
+    def clear_index(self, digram):
+        """docstring for clear_index"""
+        if self.digram_index.get(digram.hash_value()) == digram:
+            self.digram_index[digram.hash_value()] = None
 
     def print_rule(self, rule, output_array):
         """docstring for print_rule"""
