@@ -1,28 +1,47 @@
-
 class Symbol(object):
     """docstring for Symbol"""
-    def __init__(self, value, grammar):
-        from rule import Rule
-        super(Symbol, self).__init__()
+    def __init__(self, grammar):
+        """docstring for __init__"""
         self.grammar = grammar
         self.next = None
         self.prev = None
-        self.terminal = None
-        self.rule = None
-        
-        if (str == type(value)):
-            self.terminal = value
-        elif (Symbol == type(value)):
-            if value.terminal:
-                self.terminal = value.terminal
-            elif value.rule:
-                self.rule = value.rule
-                self.rule.increment_reference_count()
-        elif (Rule == type(value)):
-            self.rule = value
-            self.rule.increment_reference_count()
+
+    def print_terminal(self):
+        """docstring for print_terminal"""
+        if (' ' == self.value()):
+            return '_'
         else:
-            print "Did not recognize %s" % value
+            return self.value()
+
+    def print_rule_expansion(self, _, output_array, line_length):
+        """docstring for print_rule_expansion"""
+        output_array.append(self.print_terminal())
+        return line_length + len(self.print_terminal())
+
+    def print_rule(self, _, output_array, line_length):
+        """docstring for print_rule"""
+        output_array.append("%s " % self.print_terminal())
+        return line_length + len("%s " % self.print_terminal())
+
+    @staticmethod
+    def factory(grammar, value):
+        """docstring for factory"""
+        from rule import Rule
+        if (str == type(value)):
+            return Terminal(grammar, value)
+        elif (Terminal == type(value)):
+            return Terminal(grammar, value.terminal)
+        elif (NonTerminal == type(value)):
+            return NonTerminal(grammar, value.rule)
+        elif (Rule == type(value)):
+            return NonTerminal(grammar, value)
+        else:
+            raise "type(value) == %s" % type(value)
+    
+    @staticmethod
+    def guard(grammar, value):
+        """docstring for guard"""
+        return Guard(grammar, value)
 
     def join(self, right):
         """
@@ -49,40 +68,24 @@ class Symbol(object):
         self.next = right
         right.prev = self
 
-    def delete(self):
-        """
-        Cleans up for symbol deletion: removes hash table entry and decrements
-        rule reference count.
-        """
-        self.prev.join(self.next)
-        if not self.is_guard():
-            self.delete_digram()
-            if self.rule:
-                self.rule.decrement_reference_count()
-
     def delete_digram(self):
         """Removes the digram from the hash table"""
         if (self.is_guard() or self.next.is_guard()):
-            return
-        
-        self.grammar.clear_index(self)
+            pass
+        else:
+            self.grammar.clear_index(self)
 
     def insert_after(self, symbol):
         """Inserts a symbol after this one"""
         symbol.join(self.next)
         self.join(symbol)
 
-    def is_guard(self):
-        """
-        Returns true if this is the guard node marking the beginning and end of 
-        a rule.
-        """
-        return self.rule and (self.rule.first().prev == self)
+    def is_guard(self): return False # Overridden by Guard class
 
     def check(self):
         """
         Checks a new digram. If it appears elsewhere, deals with it by 
-        calling match(), otherwise inserts it into the hash table
+        calling process_match(), otherwise inserts it into the hash table
         """
         if (self.is_guard() or self.next.is_guard()):
             return None
@@ -114,7 +117,7 @@ class Symbol(object):
         prev = self.prev
         prev.next.delete()
         prev.next.delete()
-        prev.insert_after(Symbol(rule, self.grammar))
+        prev.insert_after(Symbol.factory(self.grammar, rule))
         if not prev.check():
             prev.next.check()
 
@@ -129,8 +132,8 @@ class Symbol(object):
         else:
             # create a new rule
             rule = Rule(self.grammar)
-            rule.last().insert_after(Symbol(self, self.grammar))
-            rule.last().insert_after(Symbol(self.next, self.grammar))
+            rule.last().insert_after(Symbol.factory(self.grammar, self))
+            rule.last().insert_after(Symbol.factory(self.grammar, self.next))
             
             match.substitute(rule)
             self.substitute(rule)
@@ -138,7 +141,7 @@ class Symbol(object):
             self.grammar.add_index(rule.first())
 
         # Check for an under-used rule
-        if (rule.first().rule and (rule.first().rule.reference_count == 1)):
+        if (NonTerminal == type(rule.first()) and (rule.first().rule.reference_count == 1)):
             rule.first().expand()
     
     def value(self):
@@ -155,3 +158,91 @@ class Symbol(object):
     def hash_value(self):
         """docstring for hash_value"""
         return "%s+%s" % (self.string_value(), self.next.string_value())
+
+
+class Terminal(Symbol):
+    """docstring for Terminal"""
+    def __init__(self, grammar, terminal):
+        super(Terminal, self).__init__(grammar)
+        self.terminal = terminal
+        
+    def value(self):
+        """docstring for value"""
+        return self.terminal
+    string_value = value
+
+    def delete(self):
+        """
+        Cleans up for symbol deletion: removes hash table entry and decrements
+        rule reference count.
+        """
+        self.prev.join(self.next)
+        self.delete_digram()
+
+
+class NonTerminal(Symbol):
+    """docstring for NonTerminal"""
+    def __init__(self, grammar, rule):
+        super(NonTerminal, self).__init__(grammar)
+        self.rule = rule
+        self.rule.increment_reference_count()
+
+    def value(self):
+        """docstring for value"""
+        return self.rule.unique_number
+
+    def string_value(self):
+        """docstring for string_value"""
+        return "rule: %d" % self.rule.unique_number
+
+    def print_rule(self, rule_set, output_array, line_length):
+        """docstring for print_rule"""
+        if (self.rule in rule_set):
+            rule_index = rule_set.index(self.rule)
+        else:
+            rule_index = len(rule_set)
+            rule_set.append(self.rule)
+        output_array.append("%d " % rule_index)
+        return line_length + len("%d " % rule_index)
+
+    def print_rule_expansion(self, rule_set, output_array, line_length):
+        """docstring for print_rule_expansion"""
+        return self.rule.print_rule_expansion(rule_set, output_array, line_length)
+
+    def delete(self):
+        """
+        Cleans up for symbol deletion: removes hash table entry and decrements
+        rule reference count.
+        """
+        self.prev.join(self.next)
+        self.delete_digram()
+        self.rule.decrement_reference_count()
+
+class Guard(Symbol):
+    """
+    The guard symbol in the linked list of symbols that make up the rule.
+    It points forward to the first symbol in the rule, and backwards to the last
+    symbol in the rule. Its own value points to the rule data structure, so that
+    symbols can find out which rule they're in.
+    """
+
+    def __init__(self, grammar, rule):
+        super(Guard, self).__init__(grammar)
+        self.rule = rule
+
+    def is_guard(self): return True
+
+    def value(self):
+        """docstring for value"""
+        return self.rule.unique_number
+
+    def string_value(self):
+        """docstring for string_value"""
+        return "rule: %d" % self.rule.unique_number
+
+    def delete(self):
+        """
+        Cleans up for symbol deletion: removes hash table entry and decrements
+        rule reference count.
+        """
+        self.prev.join(self.next)
