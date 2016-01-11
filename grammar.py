@@ -15,7 +15,11 @@ class Grammar(object):
             self.root_production.last().insert_after(Symbol.factory(self, input_sequence.pop(0)))
         while (0 < len(input_sequence)):
             self.root_production.last().insert_after(Symbol.factory(self, input_sequence.pop(0)))
-            self.root_production.last().prev.check()
+            match = self.get_index(self.root_production.last().prev)
+            if not match:
+                self.add_index(self.root_production.last().prev)
+            elif match.next != self.root_production.last().prev:
+                self.root_production.last().prev.process_match(match)
 
     def add_index(self, digram):
         """docstring for index"""

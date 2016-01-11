@@ -82,21 +82,6 @@ class Symbol(object):
 
     def is_guard(self): return False # Overridden by Guard class
 
-    def check(self):
-        """
-        Checks a new digram. If it appears elsewhere, deals with it by 
-        calling process_match(), otherwise inserts it into the hash table
-        """
-        if (self.is_guard() or self.next.is_guard()):
-            return None
-        match = self.grammar.get_index(self)
-        if not match:
-            self.grammar.add_index(self)
-            return False
-        if match.next != self:
-            self.process_match(match)
-        return True
-
     def expand(self):
         """
         This symbol is the last reference to its rule. It is deleted, and the
@@ -112,14 +97,27 @@ class Symbol(object):
         last.join(right)
         self.grammar.add_index(last)
 
+    def propagate_change(self):
+        """docstring for propagate_change"""
+        match = self.grammar.get_index(self)
+        if not match:
+            self.grammar.add_index(self)
+            if (self.next.is_guard() or self.next.next.is_guard()):
+                return
+            match = self.grammar.get_index(self.next)
+            if not match:
+                self.grammar.add_index(self.next)
+            elif match.next != self.next:
+                self.next.process_match(match)
+        elif match.next != self:
+            self.process_match(match)
+
     def substitute(self, rule):
         """Replace a digram with a non-terminal"""
         prev = self.prev
         prev.next.delete()
         prev.next.delete()
         prev.insert_after(Symbol.factory(self.grammar, rule))
-        if not prev.check():
-            prev.next.check()
 
     def process_match(self, match):
         """Deal with a matching digram"""
@@ -129,16 +127,18 @@ class Symbol(object):
             # reuse an existing rule
             rule = match.prev.rule
             self.substitute(rule)
+            self.prev.propagate_change()
         else:
             # create a new rule
             rule = Rule(self.grammar)
             rule.last().insert_after(Symbol.factory(self.grammar, self))
             rule.last().insert_after(Symbol.factory(self.grammar, self.next))
+            self.grammar.add_index(rule.first())
             
             match.substitute(rule)
+            match.prev.propagate_change()
             self.substitute(rule)
-            
-            self.grammar.add_index(rule.first())
+            self.prev.propagate_change()
 
         # Check for an under-used rule
         if (NonTerminal == type(rule.first()) and (rule.first().rule.reference_count == 1)):
