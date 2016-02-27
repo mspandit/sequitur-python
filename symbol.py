@@ -99,9 +99,7 @@ class Symbol(object):
 
     def propagate_change(self):
         """docstring for propagate_change"""
-        match = self.grammar.get_index(self)
-        if not match:
-            self.grammar.add_index(self)
+        if self.is_guard() or self.next.is_guard():
             if (self.next.is_guard() or self.next.next.is_guard()):
                 return
             match = self.grammar.get_index(self.next)
@@ -109,8 +107,19 @@ class Symbol(object):
                 self.grammar.add_index(self.next)
             elif match.next != self.next:
                 self.next.process_match(match)
-        elif match.next != self:
-            self.process_match(match)
+        else:
+            match = self.grammar.get_index(self)
+            if not match:
+                self.grammar.add_index(self)
+                if (self.next.is_guard() or self.next.next.is_guard()):
+                    return
+                match = self.grammar.get_index(self.next)
+                if not match:
+                    self.grammar.add_index(self.next)
+                elif match.next != self.next:
+                    self.next.process_match(match)
+            elif match.next != self:
+                self.process_match(match)
 
     def substitute(self, rule):
         """Replace a digram with a non-terminal"""
